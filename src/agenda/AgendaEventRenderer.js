@@ -463,8 +463,8 @@ function AgendaEventRenderer() {
 		var hoverListener = getHoverListener();
 		var colCnt = getColCnt();
 		var colWidth = getColWidth();
-		var defaultSlotHeight = getSlotHeight();
-		var snapping = snapToGridHelper(eventElement, defaultSlotHeight);
+		var displaySlotHeight = getSlotHeight();
+		var snapping = snapToGridHelper(eventElement, displaySlotHeight);
 		var slotMinutes = snapping.minutes;
 		var slotHeight = snapping.height;
 		eventElement.draggable({
@@ -504,7 +504,7 @@ function AgendaEventRenderer() {
 				}, ev, 'drag');
 			},
 			drag: function(ev, ui) {
-				snapping = snapToGridHelper(eventElement, defaultSlotHeight, ev, colWidth);
+				snapping = snapToGridHelper(eventElement, displaySlotHeight, ev, colWidth);
 				slotHeight = snapping.height;
 				slotMinutes = snapping.minutes;
 				minuteDelta = Math.round((ui.position.top - origPosition.top) / slotHeight) * slotMinutes;
@@ -560,8 +560,8 @@ function AgendaEventRenderer() {
 	function resizableSlotEvent(event, eventElement, timeElement) {
 		var slotDelta, prevSlotDelta;
 		var minuteDelta;
-		var defaultSlotHeight = getSlotHeight();
-		var snapping = snapToGridHelper(eventElement, defaultSlotHeight);
+		var displaySlotHeight = getSlotHeight();
+		var snapping = snapToGridHelper(eventElement, displaySlotHeight);
 		var slotHeight = snapping.height;
 		var slotMinutes = snapping.minutes;
 		eventElement.resizable({
@@ -577,7 +577,7 @@ function AgendaEventRenderer() {
 			},
 			resize: function(ev, ui) {
 				// don't rely on ui.size.height, doesn't take grid into account
-				snapping = snapToGridHelper(eventElement, defaultSlotHeight, ev);
+				snapping = snapToGridHelper(eventElement, displaySlotHeight, ev);
 				slotHeight = snapping.height;
 				slotMinutes = snapping.minutes;
 				slotDelta = Math.round((Math.max(slotHeight, eventElement.height()) - ui.originalSize.height) / slotHeight);
