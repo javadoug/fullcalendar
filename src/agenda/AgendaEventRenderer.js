@@ -464,7 +464,7 @@ function AgendaEventRenderer() {
 		var colCnt = getColCnt();
 		var colWidth = getColWidth();
 		var defaultSlotHeight = getSlotHeight();
-		var snapping = snapToGridHelper(defaultSlotHeight);
+		var snapping = snapToGridHelper(eventElement, defaultSlotHeight);
 		var slotMinutes = snapping.minutes;
 		var slotHeight = snapping.height;
 		eventElement.draggable({
@@ -504,10 +504,11 @@ function AgendaEventRenderer() {
 				}, ev, 'drag');
 			},
 			drag: function(ev, ui) {
-				snapping = snapToGridHelper.call(eventElement, defaultSlotHeight, ev, colWidth);
+				snapping = snapToGridHelper(eventElement, defaultSlotHeight, ev, colWidth);
 				slotHeight = snapping.height;
 				slotMinutes = snapping.minutes;
 				minuteDelta = Math.round((ui.position.top - origPosition.top) / slotHeight) * slotMinutes;
+				minuteDelta = minuteDelta - snapping.gridOffsetMinutes(event.start);
 				if (minuteDelta != prevMinuteDelta) {
 					if (!allDay) {
 						updateTimeText(minuteDelta);
@@ -549,17 +550,18 @@ function AgendaEventRenderer() {
 			}
 		}
 	}
-	
-	
-	
+
+
+
 	/* Resizing
 	--------------------------------------------------------------------------------------*/
 	
 	
 	function resizableSlotEvent(event, eventElement, timeElement) {
 		var slotDelta, prevSlotDelta;
+		var minuteDelta;
 		var defaultSlotHeight = getSlotHeight();
-		var snapping = snapToGridHelper(defaultSlotHeight);
+		var snapping = snapToGridHelper(eventElement, defaultSlotHeight);
 		var slotHeight = snapping.height;
 		var slotMinutes = snapping.minutes;
 		eventElement.resizable({
@@ -575,16 +577,17 @@ function AgendaEventRenderer() {
 			},
 			resize: function(ev, ui) {
 				// don't rely on ui.size.height, doesn't take grid into account
-				snapping = snapToGridHelper.call(eventElement, defaultSlotHeight, ev);
+				snapping = snapToGridHelper(eventElement, defaultSlotHeight, ev);
 				slotHeight = snapping.height;
 				slotMinutes = snapping.minutes;
 				slotDelta = Math.round((Math.max(slotHeight, eventElement.height()) - ui.originalSize.height) / slotHeight);
+				minuteDelta = (slotMinutes * slotDelta) - snapping.gridOffsetMinutes(eventEnd(event));
 				if (slotDelta != prevSlotDelta) {
 					timeElement.text(
 						formatDates(
 							event.start,
 							(!slotDelta && !event.end) ? null : // no change, so don't display time range
-								addMinutes(eventEnd(event), slotMinutes*slotDelta),
+								addMinutes(eventEnd(event), minuteDelta),
 							opt('timeFormat')
 						)
 					);
@@ -594,7 +597,7 @@ function AgendaEventRenderer() {
 			stop: function(ev, ui) {
 				trigger('eventResizeStop', this, event, ev, ui);
 				if (slotDelta) {
-					eventResize(this, event, 0, slotMinutes*slotDelta, ev, ui);
+					eventResize(this, event, 0, minuteDelta, ev, ui);
 				}else{
 					eventElement.css('z-index', 8);
 					showEvents(event, eventElement);
@@ -606,7 +609,7 @@ function AgendaEventRenderer() {
 
 	// snap to grid using snapMinutes setting or 
 	// temporarily disable snapping if alt key pressed
-	function snapToGridHelper(slotHeight, uiEvent, slotWidth) {
+	function snapToGridHelper(uiElement, slotHeight, uiEvent, slotWidth) {
 		var slotMinutes = opt('slotMinutes');
 		var snapMinutes = opt('snapMinutes');
 		var newSlotHeight = slotHeight;
@@ -625,13 +628,20 @@ function AgendaEventRenderer() {
 			slotMinutes = snapMinutes;
 		}
 		// update the grid to snap or not based on alt key
-		if (this.resizable) {
-			this.resizable('option', 'grid', disableSnapping ? 1 : newSlotHeight);
+		if (uiElement.resizable) {
+			uiElement.resizable('option', 'grid', disableSnapping ? 1 : newSlotHeight);
 		}
-		if (this.draggable && slotWidth) {
-			this.draggable('option', 'grid', disableSnapping ? [slotWidth, 1] : [slotWidth, newSlotHeight]);
+		if (uiElement.draggable && slotWidth) {
+			uiElement.draggable('option', 'grid', disableSnapping ? [slotWidth, 1] : [slotWidth, newSlotHeight]);
 		}
-		return {height: newSlotHeight, minutes: slotMinutes};
+		// given a time determine offset to align minutes with display grid
+		function gridOffset(time) {
+			if (this.minutes === 1) {
+				return 0;
+			}
+			return time.getMinutes() % this.minutes;
+		}
+		return {height: newSlotHeight, minutes: slotMinutes, gridOffsetMinutes: gridOffset};
 	}
 
 
