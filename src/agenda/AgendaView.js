@@ -4,6 +4,7 @@ setDefaults({
 	allDayText: 'all-day',
 	firstHour: 6,
 	slotMinutes: 30,
+	//snapMinutes: 5, no default for backwards compatibility
 	defaultEventMinutes: 120,
 	axisFormat: 'h(:mm)tt',
 	timeFormat: {
