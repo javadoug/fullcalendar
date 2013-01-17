@@ -608,6 +608,7 @@ function AgendaEventRenderer() {
 
 	// snap to grid using snapMinutes setting or 
 	// temporarily disable snapping if alt key pressed
+	// TODO: quantize the results and use a visual helper
 	function snapToGridHelper(uiElement, uiEvent, slotWidth) {
 		var slotHeight = getSlotHeight();
 		var snapHeight = getSlotHeight();
@@ -617,7 +618,9 @@ function AgendaEventRenderer() {
 		var disableSnapping = (uiEvent || {}).altKey ? true : false;
 		if (disableSnapping) {
 			snapMinutes = 1;
+			pixelsPerMinute = Math.round(pixelsPerMinute);
 		}
+		console.log('pixelsPerMinute: ' + pixelsPerMinute)
 		var hasSnapMinutes = !isNaN(snapMinutes);
 		if (hasSnapMinutes) {
 			// limit the interval of snapping
@@ -638,6 +641,7 @@ function AgendaEventRenderer() {
 		}
 		// given a time determine offset to align minutes with display grid
 		function gridOffset(time) {
+			console.log('grid offset: ' + time.getMinutes() % this.minutes)
 			return time.getMinutes() % this.minutes;
 		}
 		return {height: snapHeight, minutes: snapMinutes, gridOffsetMinutes: gridOffset};
