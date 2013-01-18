@@ -457,19 +457,18 @@ function AgendaEventRenderer() {
 		var origPosition;
 		var allDay=false;
 		var dayDelta;
-		var minuteDelta;
-		var prevMinuteDelta;
+		var minuteDelta = 0;
+		var prevMinuteDelta = 0;
 		var dis = opt('isRTL') ? -1 : 1;
 		var hoverListener = getHoverListener();
 		var colCnt = getColCnt();
 		var colWidth = getColWidth();
 		var snapping = snapToGridHelper(eventElement);
-		var slotMinutes = snapping.minutes;
 		var slotHeight = snapping.height;
 		eventElement.draggable({
 			zIndex: 9,
 			scroll: false,
-			grid: [colWidth, slotHeight],
+			grid: [colWidth, snapping.height],
 			axis: colCnt==1 ? 'y' : false,
 			opacity: opt('dragOpacity'),
 			revertDuration: opt('dragRevertDuration'),
@@ -478,6 +477,7 @@ function AgendaEventRenderer() {
 				hideEvents(event, eventElement);
 				origPosition = eventElement.position();
 				minuteDelta = prevMinuteDelta = 0;
+				snapping.start(ev, ui, cloneDate(event.start));
 				hoverListener.start(function(cell, origCell, rowDelta, colDelta) {
 					eventElement.draggable('option', 'revert', !cell);
 					clearOverlays();
@@ -503,11 +503,7 @@ function AgendaEventRenderer() {
 				}, ev, 'drag');
 			},
 			drag: function(ev, ui) {
-				snapping = snapToGridHelper(eventElement, ev, colWidth);
-				slotHeight = snapping.height;
-				slotMinutes = snapping.minutes;
-				minuteDelta = Math.round((ui.position.top - origPosition.top) / slotHeight) * slotMinutes;
-				minuteDelta = minuteDelta - snapping.gridOffsetMinutes(event.start);
+				minuteDelta = snapping.drag(ev, ui);
 				if (minuteDelta != prevMinuteDelta) {
 					if (!allDay) {
 						updateTimeText(minuteDelta);
@@ -557,45 +553,38 @@ function AgendaEventRenderer() {
 	
 	
 	function resizableSlotEvent(event, eventElement, timeElement) {
-		var slotDelta, prevSlotDelta;
-		var minuteDelta;
-		var displaySlotHeight = getSlotHeight();
+		var minuteDelta = 0;
+		var prevMinuteDelta = 0;
 		var snapping = snapToGridHelper(eventElement);
-		var slotHeight = snapping.height;
-		var slotMinutes = snapping.minutes;
 		eventElement.resizable({
 			handles: {
 				s: 'div.ui-resizable-s'
 			},
-			grid: slotHeight,
+			grid: snapping.height,
 			start: function(ev, ui) {
-				slotDelta = prevSlotDelta = 0;
 				hideEvents(event, eventElement);
 				eventElement.css('z-index', 9);
 				trigger('eventResizeStart', this, event, ev, ui);
+				snapping.start(ev, ui, eventEnd(event));
+				minuteDelta = prevMinuteDelta = 0;
 			},
 			resize: function(ev, ui) {
-				// don't rely on ui.size.height, doesn't take grid into account
-				snapping = snapToGridHelper(eventElement, ev);
-				slotHeight = snapping.height;
-				slotMinutes = snapping.minutes;
-				slotDelta = Math.round((Math.max(slotHeight, eventElement.height()) - ui.originalSize.height) / slotHeight);
-				minuteDelta = (slotMinutes * slotDelta) - snapping.gridOffsetMinutes(eventEnd(event));
-				if (slotDelta != prevSlotDelta) {
+				minuteDelta = snapping.resize(ev, ui);
+				if (minuteDelta != prevMinuteDelta) {
 					timeElement.text(
 						formatDates(
 							event.start,
-							(!slotDelta && !event.end) ? null : // no change, so don't display time range
+							(!minuteDelta && !event.end) ? null : // no change, so don't display time range
 								addMinutes(eventEnd(event), minuteDelta),
 							opt('timeFormat')
 						)
 					);
-					prevSlotDelta = slotDelta;
+					prevMinuteDelta = minuteDelta;
 				}
 			},
 			stop: function(ev, ui) {
 				trigger('eventResizeStop', this, event, ev, ui);
-				if (slotDelta) {
+				if (minuteDelta) {
 					eventResize(this, event, 0, minuteDelta, ev, ui);
 				}else{
 					eventElement.css('z-index', 8);
@@ -606,21 +595,22 @@ function AgendaEventRenderer() {
 		});
 	}
 
+
 	// snap to grid using snapMinutes setting or 
 	// temporarily disable snapping if alt key pressed
-	// TODO: quantize the results and use a visual helper
-	function snapToGridHelper(uiElement, uiEvent, slotWidth) {
+	function snapToGridHelper(uiElement) {
+		var base = 0; // minutes to add when snapping is disabled
+		var baseY = 0; // y-coord to remember when snapping is disabled
+		var pageY = 0; // y-coord used to determine pixels travelled
+		var minutes = 0; // minutes to add to the time object
+		var snapping = true; // determine first moment snapping is disabled
+		var disabled = false; // determine first moment snapping is enabled
+		var slotWidth = getColWidth(); // the display grid's visible slots
 		var slotHeight = getSlotHeight();
-		var snapHeight = getSlotHeight();
+		var snapHeight = getSlotHeight(); // the snap grid
 		var slotMinutes = opt('slotMinutes');
 		var snapMinutes = opt('snapMinutes');
 		var pixelsPerMinute = slotHeight / slotMinutes;
-		var disableSnapping = (uiEvent || {}).altKey ? true : false;
-		if (disableSnapping) {
-			snapMinutes = 1;
-			pixelsPerMinute = Math.round(pixelsPerMinute);
-		}
-		console.log('pixelsPerMinute: ' + pixelsPerMinute)
 		var hasSnapMinutes = !isNaN(snapMinutes);
 		if (hasSnapMinutes) {
 			// limit the interval of snapping
@@ -632,21 +622,67 @@ function AgendaEventRenderer() {
 			snapHeight = slotHeight;
 			snapMinutes = slotMinutes;
 		}
-		// update the grid to snap or not based on alt key
-		if (uiElement.resizable) {
-			uiElement.resizable('option', 'grid', disableSnapping ? 1 : snapHeight);
+		var gridOffsetMinutes = 0;
+		function setDisabled(uiEvent) {
+			// TODO: make key configurable
+			disabled = uiEvent.altKey ? true : false;
 		}
-		if (uiElement.draggable && slotWidth) {
-			uiElement.draggable('option', 'grid', disableSnapping ? [slotWidth, 1] : [slotWidth, snapHeight]);
+		function setMinutes(uiEvent) {
+			var pixels = uiEvent.pageY - pageY;
+			if (disabled) {
+				if (snapping) {
+					baseY = pageY;
+					pageY = uiEvent.pageY;
+					snapping = false;
+					base = minutes;
+					pixels = 0;
+				}
+				minutes = base + Math.round((pixels / 2)) - gridOffsetMinutes;
+			} else {
+				if (!snapping) {
+					pageY = baseY;
+					snapping = true;
+				}
+				minutes = (Math.round(pixels / snapHeight) * snapMinutes) - gridOffsetMinutes;
+			}
 		}
-		// given a time determine offset to align minutes with display grid
-		function gridOffset(time) {
-			console.log('grid offset: ' + time.getMinutes() % this.minutes)
-			return time.getMinutes() % this.minutes;
-		}
-		return {height: snapHeight, minutes: snapMinutes, gridOffsetMinutes: gridOffset};
+		var snapping = {
+			width: slotWidth,
+			height: snapHeight, 
+			minutes: snapMinutes, 
+			pixelsPerMinute: pixelsPerMinute,
+			start: function startSnapping(uiEvent, jqInfo, time) {
+				base = 0;
+				baseY = 0;
+				minutes = 0;
+				snapping = true; 
+				disabled = false;
+				pageY = uiEvent.pageY;
+				gridOffsetMinutes = time.getMinutes() % snapMinutes;
+			},
+			resize: function resize(uiEvent, jqInfo) {
+				setDisabled(uiEvent);
+				setMinutes(uiEvent);
+				// update the grid to snap or not based on alt key
+				if (uiElement.resizable) {
+					uiElement.resizable('option', 'grid', disabled ? 1 : snapHeight);
+				}
+				// update the visual helper to render the current minutes
+				uiElement.css('height', jqInfo.originalSize.height + (minutes * pixelsPerMinute));
+				return minutes;
+			},
+			drag: function drag(uiEvent, jqInfo) {
+				setDisabled(uiEvent);
+				setMinutes(uiEvent);
+				// update the grid to snap or not based on alt key
+				if (uiElement.draggable) {
+					uiElement.draggable('option', 'grid', disabled ? [slotWidth, 1] : [slotWidth, snapHeight]);
+				}
+				return minutes;
+			}
+		}; 
+		return snapping;
 	}
-
 
 }
 
