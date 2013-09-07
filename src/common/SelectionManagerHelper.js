@@ -15,51 +15,48 @@ function SelectionManagerHelper(viewSelectionMousedown) {
     // imports
     opt = t.opt;
 
-
     // locals
-    MOUSE = {X: "pageX", Y: "pageY"};
-    offsetAdjustment = $(t.element).offset();
     $body = $("body");
     $doc = $(document);
+    MOUSE = {X: "pageX", Y: "pageY"};
+    offsetAdjustment = $(getViewContainer()).offset();
 
-    // adjust pageX/Y for t.element's position
-    function offset(x, y) {
+    // adjust coordinates for view container's position in the page
+    function getOffsetCoord(x, y) {
         return {x: x - offsetAdjustment.left, y: y - offsetAdjustment.top};
     }
 
+    // return view container based on current view
+    function getViewContainer() {
+        return t.element;
+    }
+
+    // find or create temporary ui elements
     function findOrCreateDiv(className) {
         var div = $("." + className);
         if (div.length) {
             return div;
         }
-        return $("<div>").addClass(className).appendTo(t.element);
+        return $("<div>").addClass(className).appendTo(getViewContainer());
     }
 
-    // return segment container based on current view
-    function getSegmentContainer() {
-        var $container;
-        if (t.getSlotSegmentContainer) {
-            $container = t.getSlotSegmentContainer();
-        }
-        $container = t.getDaySegmentContainer();
-        return $container.parents(".fc-view");
-    }
-
-    // return fc events in current view
+    // return fc event containers in current view
     function getAllEvents() {
-        return getSegmentContainer().find(".fc-event");
+        return getViewContainer().find(".fc-event");
     }
 
-    // draw lasso in calendar
+    // draw lasso and highlight selected events
     function selectEvents(jqEvent) {
 
-        var mouseDownCoord, hoverListener, clearSelection;
+        var mouseDownCoord, clearSelection;
 
+        // determine if the current selection should be cleared
         clearSelection = true;
 
-        // store the coordinates of the mouse on start selection
-        mouseDownCoord = offset(jqEvent[MOUSE.X], jqEvent[MOUSE.Y]);
+        // store the coordinates of the mouse on selection start
+        mouseDownCoord = getOffsetCoord(jqEvent[MOUSE.X], jqEvent[MOUSE.Y]);
 
+        // prevent text selection handler
         function preventDefault(jqEvent) {
             jqEvent.preventDefault();
             return false;
@@ -70,7 +67,7 @@ function SelectionManagerHelper(viewSelectionMousedown) {
             getAllEvents().each(function () {
                 var segment, position, startCoord;
                 position = $(this).offset();
-                startCoord = offset(position.left, position.top);
+                startCoord = getOffsetCoord(position.left, position.top);
                 segment = {
                     start: startCoord,
                     stop: {
@@ -104,7 +101,7 @@ function SelectionManagerHelper(viewSelectionMousedown) {
         // handle mouse moving in all directions and draw lasso
         function onMousemove(jqEvent) {
             var rectangle, mouseMoveCoord;
-            mouseMoveCoord = offset(jqEvent[MOUSE.X], jqEvent[MOUSE.Y]);
+            mouseMoveCoord = getOffsetCoord(jqEvent[MOUSE.X], jqEvent[MOUSE.Y]);
             rectangle = Rectangle.fromCoordinates(mouseDownCoord, mouseMoveCoord);
             drawLasso(rectangle);
             selectEvents(rectangle);
@@ -121,9 +118,9 @@ function SelectionManagerHelper(viewSelectionMousedown) {
             }
         }
 
-        // notify ui is in select events mode
+        // notify ui user is selecting events
         $body.addClass("fc-selecting-events");
-        // prevent text selection if drag mouse out of fc
+        // prevent text selection if drag mouses out of fc
         $body.attr("unselectable", "on");
         $body.on("selectstart.fc-select-events.fc", preventDefault);
 
@@ -133,6 +130,8 @@ function SelectionManagerHelper(viewSelectionMousedown) {
 
     }
 
+    // exports
+
     function wrapSelectionMousedown(jqEvent) {
         if (opt("selectEvents")) {
             selectEvents(jqEvent);
@@ -141,7 +140,6 @@ function SelectionManagerHelper(viewSelectionMousedown) {
         }
     }
 
-    // exports
     return wrapSelectionMousedown;
 
 }
