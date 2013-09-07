@@ -453,7 +453,7 @@ function AgendaView(element, calendar, viewName) {
 
 	function slotBind(cells) {
 		cells.click(slotClick)
-			.mousedown(slotSelectionMousedown);
+			.mousedown(SelectionManagerHelper.call(t, slotSelectionMousedown));
 	}
 	
 	

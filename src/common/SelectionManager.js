@@ -24,6 +24,9 @@ function SelectionManager() {
 	var selected = false;
 
 
+	// initialize event selection plugin
+	t.daySelectionMousedown = SelectionManagerHelper.call(t, daySelectionMousedown);
+
 
 	// unselectAuto
 	if (opt('selectable') && opt('unselectAuto')) {

@@ -313,4 +313,33 @@ table.fc-border-separate {
 	border-top-width: 0;
 	}
 	
-	
+/* Select-Events Manager 
+------------------------------------------------------------*/
+
+.fc-selecting-events div {
+	-webkit-user-select: none;
+	-khtml-user-select: none;
+	-moz-user-select: none;
+	-o-user-select: none;
+	user-select: none;
+	cursor: crosshair !important;
+}
+
+.fc-selection-lasso {
+	position: absolute;
+	outline: 1px dashed silver;
+	z-index: 9999;
+}
+
+.fc-event-selected .fc-event-inner {
+	opacity: 0.65;
+	filter: alpha(opacity=50);
+}
+
+.fc-event-selected {
+	outline: 2px dashed #36C;
+	outline-offset: 2px;
+}
+.fc-event-selected .fc-event-inner {
+	outline: 2px solid white;
+}
