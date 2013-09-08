@@ -10,6 +10,8 @@ function SelectionManager() {
 	t.unselect = unselect;
 	t.reportSelection = reportSelection;
 	t.daySelectionMousedown = daySelectionMousedown;
+	// enable dependency injection
+	t.selectEventsSelectionHandler = SelectEventsSelectionHandler;
 	
 	
 	// imports
