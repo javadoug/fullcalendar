@@ -6,8 +6,11 @@ Development and testing
 -----------------------
 
 Modify files in the `src/` directory and test your changes by viewing any of the HTML files
-in the `tests/` directory. Each test file exercises a particular aspect of FullCalendar,
+in the `tests/html/` directory. Each test file exercises a particular aspect of FullCalendar,
 so you might want to create your own test file if you are developing a substantial new feature.
+
+Run Jasmine specs via Karma
+Your JavaScript can be tested using Jasmine specs. Create a spec file in `tests/specs` directory and run Karma.
 
 Building from source
 --------------------
