@@ -1,5 +1,5 @@
 /*jslint browser: true, indent: 4, todo: true */
-/*globals SelectEventsSelectionHandler */
+/*globals  */
 function SelectionManagerHelper(defaultSelectionHandler) {
 
     "use strict";

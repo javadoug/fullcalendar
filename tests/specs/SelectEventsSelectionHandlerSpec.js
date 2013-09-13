@@ -1,4 +1,174 @@
 describe("Select Events Selection Handler", function () {
+	describe("SelectEventsSelectionHandler", function () {
+		var lasso, element, optSpy, mouseDownMock, mouseMoveMock, selectEventsHandler, eventsSelectionHandlerMock;
+		beforeEach(function () {
+			// mock calendar ui
+			element = $('<div id="test-calendar"></div>').appendTo('body');
+			// mock lasso ui
+			lasso = $('<div class="fc-selection-lasso"></div>').appendTo(element);
+			// lasso must account for position of the calendar
+			element.css({
+				position: 'absolute',
+				top: '20px',
+				left: '20px',
+				width: '100px',
+				height: '100px',
+				border: '2px solid red'
+			});
+			mouseDownMock = $.Event('mousedown');
+			mouseDownMock.pageX = 20;//relative 0px
+			mouseDownMock.pageY = 20;
+			mouseMoveMock = $.Event('mousemove');
+			mouseMoveMock.pageX = 50;//relative 30px
+			mouseMoveMock.pageY = 50;
+			optSpy = jasmine.createSpy('optSpy');
+			optSpy.andReturn(true);
+			eventsSelectionHandlerMock = {
+                opt: optSpy, 
+                isEventDraggable: jasmine.createSpy('isEventDraggableSpy')
+            };
+			eventsSelectionHandlerMock.element = element;
+			eventsSelectionHandlerMock.isEventDraggable.andReturn(true);
+			selectEventsHandler = SelectEventsSelectionHandler.call(eventsSelectionHandlerMock);
+			element.on('mousedown.test.fc', selectEventsHandler);
+		});
+		afterEach(function () {
+			// and then clean up event handlers
+			element.trigger($.Event('mouseup'));
+			element.remove();
+			$('body').off('.fc');
+			$(document).off('.fc');
+		});
+		it("adds 'fc-selecting-events' class to body when dragging starts on calendar", function () {
+			// setup
+			element.trigger(mouseDownMock);
+			expect($('body').is('.fc-selecting-events')).toBeTruthy();
+			// and then clean up event handlers
+			element.trigger($.Event('mouseup'));
+		});
+		describe("drawLasso", function () {
+			it("paints a lasso based on mousedown and mousemove events", function () {
+				// setup
+				element.trigger(mouseDownMock);
+				element.trigger(mouseMoveMock);
+				// validate
+				var position = lasso.position();
+				position.width = lasso.outerWidth();
+				position.height = lasso.outerHeight();
+				expect(position).toInclude({top: 0, left: 0, width: 30, height: 30});
+				// and then clean up event handlers
+				element.trigger($.Event('mouseup'));
+			});
+			it("paints a lasso if mouse starts from bottom right side of calendar", function () {
+				// setup
+				mouseDownMock.pageX = 120;//relative 100px
+				mouseDownMock.pageY = 120;
+				mouseMoveMock.pageX = 50;//relative 30px
+				mouseMoveMock.pageY = 50;
+				element.trigger(mouseDownMock);
+				element.trigger(mouseMoveMock);
+				// validate
+				var position = lasso.position();
+				position.width = lasso.outerWidth();
+				position.height = lasso.outerHeight();
+				expect(position).toInclude({top: 30, left: 30, width: 70, height: 70});
+				// and then clean up event handlers
+				element.trigger($.Event('mouseup'));
+			});
+		});
+		describe("select events", function () {
+			var events;
+			beforeEach(function () {
+				var css = {position: 'absolute', border: '1px solid green'};
+				events = [];
+				css.width = '20px';
+				css.height = '20px';
+				events.push($('<div class="fc-event"></div>').appendTo(element));
+				events.push($('<div class="fc-event"></div>').appendTo(element));
+				events.push($('<div class="fc-event"></div>').appendTo(element));
+				css.top = '2px';
+				css.left = '2px';
+				events[0].css(css);
+				css.top = '40px';
+				css.left = '24px';
+				events[1].css(css);
+				css.top = '80px';
+				css.left = '48px';
+				events[2].css(css); 
+			});
+			it("selects 'fc-event' elements that intersect with the lasso", function () {
+				var position, selected;
+				// setup: select one event
+				element.trigger(mouseDownMock);
+				element.trigger(mouseMoveMock);
+				// validate
+				selected = element.find(".ui-selected");
+				expect(selected.length).toEqual(1);
+				position = selected.position();
+				position.width = selected.outerWidth();
+				position.height = selected.outerHeight();
+				expect(position).toInclude({top: 2, left: 2, width: 20, height: 20});
+				// setup: select all three events
+				mouseMoveMock.pageX = 90;//relative 70px
+				mouseMoveMock.pageY = 103;//relative 83px
+				element.trigger(mouseMoveMock);
+				// validate
+				selected = element.find(".ui-selected");
+				expect(selected.length).toEqual(3);
+				// and then clean up event handlers
+				element.trigger($.Event('mouseup'));
+			});
+			it("unselects 'fc-event-selected' elements that intersect with the lasso", function () {
+				var position, selected;
+				// setup: select all three events
+				mouseDownMock.pageX = 20;
+				mouseDownMock.pageY = 20;
+				element.trigger(mouseDownMock);
+				mouseMoveMock.pageX = 90;//relative 70px
+				mouseMoveMock.pageY = 103;//relative 83px
+				element.trigger(mouseMoveMock);
+				// validate
+				selected = element.find(".ui-selected");
+				expect(selected.length).toEqual(3);
+				// and then clean up event handlers
+				element.trigger($.Event('mouseup'));
+				// setup: deselect one event
+				mouseDownMock.pageX = 20;//relative 0px
+				mouseDownMock.pageY = 20;
+				element.trigger(mouseDownMock);
+				mouseMoveMock.pageX = 80;//relative 10px
+				mouseMoveMock.pageY = 80;
+				element.trigger(mouseMoveMock);
+				// validate
+				selected = element.find(".ui-selected");
+				expect(selected.length).toEqual(2);
+			});
+			it("selects 'fc-event' elements when clicked with alt key held", function () {
+				var clickEvent = $.Event('click');
+				// setup: click on two events
+				clickEvent.altKey = true;
+				events[0].trigger(clickEvent);
+				clickEvent = $.Event('click');
+				clickEvent.altKey = true;
+				events[1].trigger(clickEvent);
+				// validate
+				selected = element.find(".ui-selected");
+				expect(selected.length).toBe(2);
+			});
+			it("unselects 'fc-event-selected' elements when clicked with alt key held", function () {
+				var clickEvent = $.Event('click');
+				// setup: click on two events
+				clickEvent.altKey = true;
+				events[0].trigger(clickEvent);
+				clickEvent = $.Event('click');
+				clickEvent.altKey = true;
+				events[0].trigger(clickEvent);
+				// validate
+				selected = element.find(".ui-selected");
+				expect(selected.length).toBe(0);				
+			});
+		});
+	});
 	describe("Rectangle", function() {
 		var coord1, coord2, rectangle1;
 		beforeEach(function () {

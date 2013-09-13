@@ -331,15 +331,15 @@ table.fc-border-separate {
 	z-index: 9999;
 }
 
-.fc-event-selected .fc-event-inner {
+.fc-event.ui-selected .fc-event-inner {
 	opacity: 0.65;
 	filter: alpha(opacity=50);
 }
 
-.fc-event-selected {
-	outline: 2px dashed #36C;
+.fc-event.ui-selected {
+	outline: 2px dashed black;
 	outline-offset: 2px;
 }
-.fc-event-selected .fc-event-inner {
+.fc-event.ui-selected .fc-event-inner {
 	outline: 2px solid white;
 }

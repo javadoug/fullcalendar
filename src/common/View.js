@@ -119,6 +119,8 @@ function View(element, calendar, viewName) {
 		}else{
 			eventElementsByID[event._id] = [element];
 		}
+		// two way binding to enable ui to update multiple events
+		element.data('fc:event', event);
 	}
 	
 	

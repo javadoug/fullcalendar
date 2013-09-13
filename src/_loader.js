@@ -33,6 +33,8 @@ if (!legacy) {
 	}
 }
 
+jslib('../lib/jquery-ui-plugin-dragmultiple.js');
+
 if (debug && (!window.console || !window.console.log)) {
 	jslib('../tests/lib/firebug-lite/firebug-lite-compressed.js');
 }
@@ -60,6 +62,7 @@ js('common/View.js');
 js('common/DayEventRenderer.js');
 js('common/SelectionManager.js');
 js('common/SelectionManagerHelper.js');
+js('common/SelectEventsSelectionHandler.js');
 js('common/OverlayManager.js');
 js('common/CoordinateGrid.js');
 js('common/HoverListener.js');

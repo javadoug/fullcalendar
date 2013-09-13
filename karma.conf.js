@@ -50,9 +50,12 @@ module.exports = function(config) {
         // pickup any new files
         'src/**/*.js',
 
+        /* test framework files */
+        'tests/lib/jquery.simulate.js',
+
         /* spec files listed here */
         'tests/specs/SpecHelper.js',
-        'tests/specs/**/*Spec.js'
+        'tests/specs/**/*[sS]pec.js'
     ],
 
 
