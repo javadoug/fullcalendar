@@ -14,6 +14,6 @@
  * Date: @DATE
  *
  */
- 
+
 (function($, undefined) {
 

@@ -363,7 +363,7 @@ function AgendaView(element, calendar, viewName) {
 		}
 
 		// TODO: dry this up
-		pixelsPerMinute = slotHeight / slotMinutes;
+		pixelsPerMinute = parseFloat(slotHeight / slotMinutes);
 		var hasSnapMinutes = !isNaN(snapMinutes);
 		if (hasSnapMinutes) {
 			// limit the interval of snapping
@@ -642,16 +642,18 @@ function AgendaView(element, calendar, viewName) {
 		if (time >= addMinutes(cloneDate(day), maxMinute)) {
 			return slotTable.height();
 		}
-		var slotMinutes = snapMinutes,
-			minutes = time.getHours()*60 + time.getMinutes() - minMinute,
-			slotI = Math.floor(minutes / snapMinutes),
+		var minutes = time.getHours()*60 + time.getMinutes() - minMinute,
+			slotI = Math.floor(minutes / slotMinutes),
 			slotTop = slotTopCache[slotI];
 		if (slotTop === undefined) {
-			slotTop = slotTopCache[slotI] = snapHeight * slotI; //slotTable.find('tr:eq(' + slotI + ') td div')[0].offsetTop; //.position().top; // need this optimization???
+			// the only reliable way to ensure we work reasonably well with zoom (ctrl +/-)
+			slotTop = slotTopCache[slotI] = slotTable.find('tr:eq(' + slotI + ') td div')[0].offsetTop; //.position().top; // need this optimization???
 		}
-		return Math.max(0, Math.round(
-			slotTop - 1 + snapHeight * ((minutes % snapMinutes) / snapMinutes)
-		));
+		// adjust for snapping offset from top of slot
+		var minutesPastSlotTop = minutes % slotMinutes;
+		var adjustHeightPastSlotTop = snapHeight * parseFloat(minutesPastSlotTop / snapMinutes);
+		var adjustElementJustBelowSlotMarkers = -1;
+		return Math.max(0, Math.round(slotTop + adjustHeightPastSlotTop + adjustElementJustBelowSlotMarkers));
 	}
 	
 	

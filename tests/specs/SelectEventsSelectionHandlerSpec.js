@@ -96,7 +96,7 @@ describe("Select Events Selection Handler", function () {
 				css.left = '48px';
 				events[2].css(css); 
 			});
-			it("selects 'fc-event' elements that intersect with the lasso", function () {
+			it("selects '.fc-event' elements that intersect with the lasso", function () {
 				var position, selected;
 				// setup: select one event
 				element.trigger(mouseDownMock);
@@ -118,7 +118,7 @@ describe("Select Events Selection Handler", function () {
 				// and then clean up event handlers
 				element.trigger($.Event('mouseup'));
 			});
-			it("unselects 'fc-event-selected' elements that intersect with the lasso", function () {
+			it("unselects '.fc-event.ui-selected' elements that intersect with the lasso", function () {
 				var position, selected;
 				// setup: select all three events
 				mouseDownMock.pageX = 20;
@@ -143,25 +143,25 @@ describe("Select Events Selection Handler", function () {
 				selected = element.find(".ui-selected");
 				expect(selected.length).toEqual(2);
 			});
-			it("selects 'fc-event' elements when clicked with alt key held", function () {
+			it("selects '.fc-event' elements when clicked with shift key held", function () {
 				var clickEvent = $.Event('click');
 				// setup: click on two events
-				clickEvent.altKey = true;
+				clickEvent.shiftKey = true;
 				events[0].trigger(clickEvent);
 				clickEvent = $.Event('click');
-				clickEvent.altKey = true;
+				clickEvent.shiftKey = true;
 				events[1].trigger(clickEvent);
 				// validate
 				selected = element.find(".ui-selected");
 				expect(selected.length).toBe(2);
 			});
-			it("unselects 'fc-event-selected' elements when clicked with alt key held", function () {
+			it("unselects '.fc-event.ui-selected' elements when clicked with shift key held", function () {
 				var clickEvent = $.Event('click');
 				// setup: click on two events
-				clickEvent.altKey = true;
+				clickEvent.shiftKey = true;
 				events[0].trigger(clickEvent);
 				clickEvent = $.Event('click');
-				clickEvent.altKey = true;
+				clickEvent.shiftKey = true;
 				events[0].trigger(clickEvent);
 				// validate
 				selected = element.find(".ui-selected");

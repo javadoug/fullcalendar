@@ -175,6 +175,7 @@ function SelectEventsSelectionHandler() {
             if (clearSelection) {
                 getAllEvents().removeClass('ui-selected');
             }
+            $body.off("selectstart.fc-select-events.fc");
         }
 
         // prevent text selection if drag mouses out of fc
@@ -193,8 +194,10 @@ function SelectEventsSelectionHandler() {
         if (!opt('selectEvents')) {
             return;
         }
-        jqEvent.preventDefault();
         jqEvent.stopPropagation();
+        if (!jqEvent.shiftKey) {
+            return;
+        }
         var segment = $(jqEvent.currentTarget);
         if (segment.is('.ui-selected')) {
             segment.removeClass('ui-selected');
@@ -204,7 +207,23 @@ function SelectEventsSelectionHandler() {
         return false;
     }
 
-    // click on fc-event to clear or append to selection
+    function onCalendarClick(jqEvent) {
+         if (!opt('selectEvents')) {
+            return;
+        }
+        getAllEvents().removeClass('ui-selected');
+    }
+
+    function onEscapeKeyUp(jqEvent) {
+        if (jqEvent.which === $.ui.keyCode.ESCAPE) {
+            $(jqEvent.currentTarget).find('.fc-event').removeClass('ui-selected');
+        }
+    }
+
+    // fc-event listeners to clear or append to selection
+    $body.off(".fc-select-events.fc");
+    $body.on("keyup.fc-select-events.fc", onEscapeKeyUp);
+    $body.on("click.fc-select-events.fc", onCalendarClick);
     $body.on("click.fc-select-events.fc", '.fc-event', onEventClick);
 
     // exports

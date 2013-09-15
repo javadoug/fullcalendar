@@ -21,7 +21,11 @@ function View(element, calendar, viewName) {
 	t.showEvents = showEvents;
 	t.hideEvents = hideEvents;
 	t.eventDrop = eventDrop;
+	t.eventsDrop = eventsDrop;
 	t.eventResize = eventResize;
+	calendar.getEventElements = getEventElements;
+	t.SelectedEventsViewHelper = SelectedEventsViewHelper;
+
 	// t.title
 	// t.start, t.end
 	// t.visStart, t.visEnd
@@ -110,7 +114,14 @@ function View(element, calendar, viewName) {
 	/* Event Elements
 	------------------------------------------------------------------------------*/
 	
-	
+	function getEventElements(id) {
+		// always return a value
+		if (id) {
+			return eventElementsByID[id] || [];
+		}
+		return [];
+	}
+
 	// report when view creates an element for an event
 	function reportEventElement(event, element) {
 		eventElements.push(element);
@@ -135,7 +146,8 @@ function View(element, calendar, viewName) {
 		eventElement
 			.click(function(ev) {
 				if (!eventElement.hasClass('ui-draggable-dragging') &&
-					!eventElement.hasClass('ui-resizable-resizing')) {
+					!eventElement.hasClass('ui-resizable-resizing') &&
+					!(opt('selectEvents') && ev.altKey)) {
 						return trigger('eventClick', this, event, ev);
 					}
 			})
@@ -222,6 +234,59 @@ function View(element, calendar, viewName) {
 	}
 	
 	
+	function eventsDrop(eventElements, events, dayDelta, minuteDelta, allDay, ev, ui) {
+
+		var i, event, undo, undoHandlers;
+
+		// update the event instance and return revert handler
+		function move(event) {
+			var eventId, origAllDay, reverted;
+			origAllDay = event.allDay;
+			eventId = event._id;
+			reverted = false;
+			// TODO: really move related events that may not be selected???
+			// TODO: selection should then select these related events but
+			// 	what if they are not visible in current view?
+			moveEvents(eventsByID[eventId], dayDelta, minuteDelta, allDay);
+			return function undoMoveEvent() {
+				if (reverted) {
+					return;
+				}
+				reverted = true;
+				// TODO: investigate cases where this inverse technique might not work
+				moveEvents(eventsByID[eventId], -dayDelta, -minuteDelta, origAllDay);
+			};
+		}
+
+		undoHandlers = [];
+
+		for (i = 0; i < events.length; i++) {
+			undo = move(events[i]);
+			undoHandlers.push(undo);
+		}
+
+		trigger(
+			'eventsDrop',
+			eventElements,
+			events,
+			dayDelta,
+			minuteDelta,
+			allDay,
+			function undoMoveEvents() {
+				for (i = 0; i < undoHandlers.length; i++) {
+					undoHandlers[i]();
+				}
+				reportEventChange();
+			},
+			ev,
+			ui
+		);
+
+		// update the fc canvas
+		reportEventChange();
+
+	}
+
 	
 	/* Event Modification Math
 	---------------------------------------------------------------------------------*/

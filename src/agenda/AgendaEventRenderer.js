@@ -41,12 +41,15 @@ function AgendaEventRenderer() {
 	var showEvents = t.showEvents;
 	var hideEvents = t.hideEvents;
 	var eventDrop = t.eventDrop;
+	var eventsDrop = t.eventsDrop;
 	var eventResize = t.eventResize;
 	var renderDayOverlay = t.renderDayOverlay;
 	var clearOverlays = t.clearOverlays;
 	var calendar = t.calendar;
 	var formatDate = calendar.formatDate;
 	var formatDates = calendar.formatDates;
+	// inject class from View.js to enable unit testing
+	var SelectedEventsViewHelper = t.SelectedEventsViewHelper;
 	
 	
 	
@@ -328,6 +331,7 @@ function AgendaEventRenderer() {
 	function bindDaySeg(event, eventElement, seg) {
 		if (isEventDraggable(event)) {
 			draggableDayEvent(event, eventElement, seg.isStart);
+			// draggableSlotEvent(event, eventElement, eventElement.find('div.fc-event-time'));
 		}
 		if (seg.isEnd && isEventResizable(event)) {
 			resizableDayEvent(event, eventElement, seg);
@@ -367,51 +371,69 @@ function AgendaEventRenderer() {
 		var slotHeight = getSlotHeight();
 		var slotMinutes = opt('slotMinutes');
 		var minMinute = getMinMinute();
+		// enable selection, drag and drop of multiple events
+		var selectedEventsViewHelper = SelectedEventsViewHelper.call(t, eventElement);
 		eventElement.draggable({
 			zIndex: 9,
 			opacity: opt('dragOpacity', 'month'), // use whatever the month view was using
 			revertDuration: opt('dragRevertDuration'),
+			multiple: selectedEventsViewHelper.multipleOptions,
 			start: function(ev, ui) {
 				trigger('eventDragStart', eventElement, event, ev, ui);
 				hideEvents(event, eventElement);
 				origWidth = eventElement.width();
 				hoverListener.start(function(cell, origCell, rowDelta, colDelta) {
 					clearOverlays();
-					if (cell) {
-						//setOverflowHidden(true);
-						revert = false;
-						dayDelta = colDelta * dis;
-						if (!cell.row) {
-							// on full-days
-							renderDayOverlay(
-								addDays(cloneDate(event.start), dayDelta),
-								addDays(exclEndDay(event), dayDelta)
-							);
-							resetElement();
-						}else{
-							// mouse is over bottom slots
-							if (isStart) {
-								if (allDay) {
-									// convert event to temporary slot-event
-									eventElement.width(colWidth - 10); // don't use entire width
-									setOuterHeight(
-										eventElement,
-										slotHeight * Math.round(
-											(event.end ? ((event.end - event.start) / MINUTE_MS) : opt('defaultEventMinutes')) / slotMinutes
-										)
-									);
-									eventElement.draggable('option', 'grid', [colWidth, 1]);
-									allDay = false;
+					selectedEventsViewHelper.getSelection().each(function () {
+						if (cell) {
+							//setOverflowHidden(true);
+							revert = false;
+							dayDelta = colDelta * dis;
+							if (!cell.row) {
+								// on full-days
+								renderDayOverlay(
+									addDays(cloneDate(this.event.start), dayDelta),
+									addDays(exclEndDay(this.event), dayDelta)
+								);
+								if (!allDay) {
+									allDay = true;
 								}
+								this.resetElement(allDay, colWidth, slotHeight);
 							}else{
-								revert = true;
+								// mouse is over bottom slots
+								if (isStart) {
+									if (allDay) {
+										// convert event to temporary slot-event
+										this.eventElement.width(colWidth - 10); // don't use entire width
+										setOuterHeight(
+											this.eventElement,
+											slotHeight * Math.round(
+												(this.event.end ? ((this.event.end - this.event.start) / MINUTE_MS) : opt('defaultEventMinutes')) / slotMinutes
+											)
+										);
+										// // DAR:TODO do we need to reset all of the events or just the target
+										// this.eventElement.draggable('option', 'grid', [colWidth, 1]);
+										allDay = false;
+									}
+								}else{
+									revert = true;
+								}
 							}
+							revert = revert || (allDay && !dayDelta);
+						}else{
+							if (!allDay) {
+								allDay = true;
+							}
+							this.resetElement(allDay, colWidth, slotHeight);
+							//setOverflowHidden(false);
+							revert = true;
 						}
-						revert = revert || (allDay && !dayDelta);
-					}else{
-						resetElement();
-						//setOverflowHidden(false);
-						revert = true;
+					});
+					var convertToSlot = (cell && cell.row && isStart && allDay);
+					if (convertToSlot) {
+						// reset the snapping grid
+						// DAR:TODO do we need to reset all of the events or just the target
+						eventElement.draggable('option', 'grid', [colWidth, 1]);
 					}
 					eventElement.draggable('option', 'revert', revert);
 				}, ev, 'drag');
@@ -421,20 +443,27 @@ function AgendaEventRenderer() {
 				clearOverlays();
 				trigger('eventDragStop', eventElement, event, ev, ui);
 				if (revert) {
-					// hasn't moved or is out of bounds (draggable has already reverted)
-					resetElement();
-					eventElement.css('filter', ''); // clear IE opacity side-effects
-					showEvents(event, eventElement);
+					if (!allDay) {
+						allDay = true;
+					}
+					selectedEventsViewHelper.getSelection().each(function () {
+						// hasn't moved or is out of bounds (draggable has already reverted)
+						this.resetElement(allDay, colWidth, slotHeight);
+						this.eventElement.css('filter', ''); // clear IE opacity side-effects
+						showEvents(this.event, this.eventElement);
+					});
 				}else{
 					// changed!
-					var minuteDelta = 0;
-					if (!allDay) {
-						minuteDelta = Math.round((eventElement.offset().top - getBodyContent().offset().top) / slotHeight)
-							* slotMinutes
-							+ minMinute
-							- (event.start.getHours() * 60 + event.start.getMinutes());
-					}
-					eventDrop(this, event, dayDelta, minuteDelta, allDay, ev, ui);
+					selectedEventsViewHelper.getSelection().each(function () {
+						var minuteDelta = 0;
+						if (!allDay) {
+							minuteDelta = Math.round((this.eventElement.offset().top - getBodyContent().offset().top) / slotHeight)
+								* slotMinutes
+								+ minMinute
+								- (this.event.start.getHours() * 60 + this.event.start.getMinutes());
+						}
+						eventDrop(this.eventElement, this.event, dayDelta, minuteDelta, allDay, ev, ui);
+					});
 				}
 				//setOverflowHidden(false);
 			}
@@ -465,6 +494,10 @@ function AgendaEventRenderer() {
 		var colWidth = getColWidth();
 		var snapping = snapToGridHelper(eventElement);
 		var slotHeight = snapping.height;
+		var slotMinutes = opt('slotMinutes');
+		var minMinute = getMinMinute();
+		// enable selection, drag and drop of multiple events
+		var selectedEventsViewHelper = SelectedEventsViewHelper.call(t, eventElement);
 		eventElement.draggable({
 			zIndex: 9,
 			scroll: false,
@@ -472,6 +505,7 @@ function AgendaEventRenderer() {
 			axis: colCnt==1 ? 'y' : false,
 			opacity: opt('dragOpacity'),
 			revertDuration: opt('dragRevertDuration'),
+			multiple: selectedEventsViewHelper.multipleOptions,
 			start: function(ev, ui) {
 				trigger('eventDragStart', eventElement, event, ev, ui);
 				hideEvents(event, eventElement);
@@ -483,31 +517,31 @@ function AgendaEventRenderer() {
 					clearOverlays();
 					if (cell) {
 						dayDelta = colDelta * dis;
-						if (opt('allDaySlot') && !cell.row) {
-							// over full days
-							if (!allDay) {
-								// convert to temporary all-day event
-								allDay = true;
-								timeElement.hide();
-								eventElement.draggable('option', 'grid', null);
+						selectedEventsViewHelper.getSelection().each(function () {
+							if (opt('allDaySlot') && !cell.row) {
+								// over full days
+								allDay = !allDay;
+								renderDayOverlay(
+									addDays(cloneDate(this.event.start), dayDelta),
+									addDays(exclEndDay(this.event), dayDelta)
+								);
+							} else {
+								// on slots
+								allDay = false;
 							}
-							renderDayOverlay(
-								addDays(cloneDate(event.start), dayDelta),
-								addDays(exclEndDay(event), dayDelta)
-							);
-						}else{
-							// on slots
-							resetElement();
-						}
+							this.resetElement(allDay, colWidth, slotHeight);
+						});
 					}
 				}, ev, 'drag');
 			},
 			drag: function(ev, ui) {
 				minuteDelta = snapping.drag(ev, ui);
 				if (minuteDelta != prevMinuteDelta) {
-					if (!allDay) {
-						updateTimeText(minuteDelta);
-					}
+					selectedEventsViewHelper.getSelection().each(function () {
+						if (!this.event.allDay) {
+							this.updateTimeText(minuteDelta);
+						}
+					});
 					prevMinuteDelta = minuteDelta;
 				}
 			},
@@ -515,17 +549,48 @@ function AgendaEventRenderer() {
 				var cell = hoverListener.stop();
 				clearOverlays();
 				trigger('eventDragStop', eventElement, event, ev, ui);
+				// update the fc event instances and redraw the calendar
+
+				var selection = selectedEventsViewHelper.getSelection();
+				var elements = selection.map(function () {
+					return this.eventElement;
+				})
+				var events = selection.map(function () {
+					return this.event;
+				});
+
 				if (cell && (dayDelta || minuteDelta || allDay)) {
 					// changed!
-					eventDrop(this, event, dayDelta, allDay ? 0 : minuteDelta, allDay, ev, ui);
-				}else{
-					// either no change or out-of-bounds (draggable has already reverted)
-					resetElement();
-					eventElement.css('filter', ''); // clear IE opacity side-effects
-					eventElement.css(origPosition); // sometimes fast drags make event revert to wrong position
-					updateTimeText(0);
-					showEvents(event, eventElement);
+					// if(!allDay) {
+					// 	// DAR:TODO only do this if dragging event out of day bar
+					// 	// minuteDelta = Math.round((this.eventElement.offset().top - getBodyContent().offset().top) / slotHeight)
+					// 	// 	* slotMinutes
+					// 	// 	+ minMinute
+					// 	// 	- (this.event.start.getHours() * 60 + this.event.start.getMinutes());
+					// }
+					if (selection.length > 1) {
+						eventsDrop(elements, events, dayDelta, allDay ? 0 : minuteDelta, allDay, ev, ui);
+					} else {
+						eventDrop(elements[0], events[0], dayDelta, allDay ? 0 : minuteDelta, allDay, ev, ui);
+					}
+				} else {
+					if (allDay) {
+						allDay = false;
+					}
+					selection.each(function () {
+						// either no change or out-of-bounds (draggable has already reverted)
+						this.resetElement(allDay, colWidth, slotHeight);
+						this.eventElement.css('filter', ''); // clear IE opacity side-effects
+						// TODO: research the defect for this fix to see how to reproduce
+						//  unfortunately this causes multiple to all collapse on target
+						// this.eventElement.css(origPosition); // sometimes fast drags make event revert to wrong position
+						this.updateTimeText(0);
+						showEvents(this.event, this.eventElement);
+					});
 				}
+
+				// clear the selection caches
+				selectedEventsViewHelper.clearSelectionCache();
 			}
 		});
 		function updateTimeText(minuteDelta) {
@@ -596,7 +661,7 @@ function AgendaEventRenderer() {
 	}
 
 
-	// snap to grid using snapMinutes setting or 
+	// snap to grid using snapMinutes setting or
 	// temporarily disable snapping if alt key pressed
 	function snapToGridHelper(uiElement) {
 		var base = 0; // minutes to add when snapping is disabled
@@ -610,7 +675,7 @@ function AgendaEventRenderer() {
 		var snapHeight = getSlotHeight(); // the snap grid
 		var slotMinutes = opt('slotMinutes');
 		var snapMinutes = opt('snapMinutes');
-		var pixelsPerMinute = slotHeight / slotMinutes;
+		var pixelsPerMinute = parseFloat(slotHeight / slotMinutes);
 		var hasSnapMinutes = !isNaN(snapMinutes);
 		if (hasSnapMinutes) {
 			// limit the interval of snapping
@@ -646,16 +711,16 @@ function AgendaEventRenderer() {
 				minutes = (Math.round(pixels / snapHeight) * snapMinutes) - gridOffsetMinutes;
 			}
 		}
-		var snapping = {
+		var exports = {
 			width: slotWidth,
-			height: snapHeight, 
-			minutes: snapMinutes, 
+			height: snapHeight,
+			minutes: snapMinutes,
 			pixelsPerMinute: pixelsPerMinute,
 			start: function startSnapping(uiEvent, jqInfo, time) {
 				base = 0;
 				baseY = 0;
 				minutes = 0;
-				snapping = true; 
+				snapping = true;
 				disabled = false;
 				pageY = uiEvent.pageY;
 				gridOffsetMinutes = time.getMinutes() % snapMinutes;
@@ -680,8 +745,8 @@ function AgendaEventRenderer() {
 				}
 				return minutes;
 			}
-		}; 
-		return snapping;
+		};
+		return exports;
 	}
 
 }

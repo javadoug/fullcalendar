@@ -16,7 +16,7 @@ function SelectionManagerHelper(defaultSelectionHandler) {
 
     // exports
     function mousedownSelectionHandler(jqEvent) {
-        if (opt("selectEvents")) {
+        if (opt("selectEvents") && jqEvent.shiftKey) {
             eventsSelectionHandler(jqEvent);
         } else {
             defaultSelectionHandler(jqEvent);

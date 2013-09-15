@@ -63,6 +63,7 @@ js('common/DayEventRenderer.js');
 js('common/SelectionManager.js');
 js('common/SelectionManagerHelper.js');
 js('common/SelectEventsSelectionHandler.js');
+js('common/SelectedEventsViewHelper.js');
 js('common/OverlayManager.js');
 js('common/CoordinateGrid.js');
 js('common/HoverListener.js');

@@ -4,7 +4,8 @@ describe("Selection Manager Helper", function () {
 
 	beforeEach(function () {
 		optSpy = jasmine.createSpy('optSpy');
-		mousedownMock = {fake: "mousedown event"};
+		// feature requires the shift key to select events
+		mousedownMock = {fake: "mousedown event", shiftKey: true};
 		selectionManagerMock = {opt: optSpy };
 		eventsSelectionHandlerSpy = jasmine.createSpy('selectEventsSelectionHandlerSpy');
 		selectionManagerMock.selectEventsSelectionHandler = function inject() {

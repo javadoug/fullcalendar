@@ -8,7 +8,7 @@
  * Date: @DATE
  *
  */
- 
+
 (function($) {
 
 
