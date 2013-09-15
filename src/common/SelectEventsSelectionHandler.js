@@ -14,10 +14,10 @@ var Rectangle = {
     fromCoordinates: function coordinatesToRectangle(coord1, coord2, mapXY) {
         "use strict";
         var start = {}, stop = {}, map = mapXY || {x: "x", y: "y"};
-        start[map.x] = Math.min(coord1[map.x], coord2[map.x]);
-        start[map.y] = Math.min(coord1[map.y], coord2[map.y]);
-        stop[map.x] = Math.max(coord1[map.x], coord2[map.x]);
-        stop[map.y] = Math.max(coord1[map.y], coord2[map.y]);
+        start.x = Math.min(coord1[map.x], coord2[map.x]);
+        start.y = Math.min(coord1[map.y], coord2[map.y]);
+        stop.x = Math.max(coord1[map.x], coord2[map.x]);
+        stop.y = Math.max(coord1[map.y], coord2[map.y]);
         return {
             start: start,
             stop: stop,
@@ -44,7 +44,7 @@ function SelectEventsSelectionHandler() {
 
     "use strict";
 
-    var t, opt, MOUSE, viewContainerOffset, $body, $doc, isEventDraggable;
+    var t, opt, MOUSE, $body, $doc, isEventDraggable;
 
     t = this;
 
@@ -55,12 +55,16 @@ function SelectEventsSelectionHandler() {
     // locals
     $body = $("body");
     $doc = $(document);
-    MOUSE = {X: "pageX", Y: "pageY"};
-    viewContainerOffset = t.element.offset();
+    MOUSE = {X: "pageX", Y: "pageY", lassoX: "clientX", lassoY: "clientY"};
 
-    // adjust coordinates for view container's position in the page
-    function getOffsetCoord(x, y) {
-        return {x: x - viewContainerOffset.left, y: y - viewContainerOffset.top};
+    // lasso is fixed positioned and events are relative positioned
+    function getMouseCoordinates(jqEvent) {
+        return {
+            x: jqEvent[MOUSE.X],
+            y: jqEvent[MOUSE.Y],
+            xLasso: jqEvent[MOUSE.lassoX],
+            yLasso: jqEvent[MOUSE.lassoY]
+        };
     }
 
     // return view container based on current view
@@ -83,7 +87,7 @@ function SelectEventsSelectionHandler() {
     }
 
     // draw lasso and highlight selected events
-    function selectEvents(jqEvent) {
+    function selectEventsInitiator(jqEvent) {
 
         var mouseDownCoord, clearSelection, addToSelection;
 
@@ -94,7 +98,7 @@ function SelectEventsSelectionHandler() {
         addToSelection = false;
 
         // store the coordinates of the mouse on selection start
-        mouseDownCoord = getOffsetCoord(jqEvent[MOUSE.X], jqEvent[MOUSE.Y]);
+        mouseDownCoord = getMouseCoordinates(jqEvent);
 
         // prevent text selection handler
         function preventDefault(jqEvent) {
@@ -108,7 +112,7 @@ function SelectEventsSelectionHandler() {
                 var $this, event, segment, position, startCoord;
                 $this = $(this);
                 position = $this.offset();
-                startCoord = getOffsetCoord(position.left, position.top);
+                startCoord = {x: position.left, y: position.top};
                 segment = {
                     start: startCoord,
                     stop: {
@@ -149,11 +153,16 @@ function SelectEventsSelectionHandler() {
 
         // handle mouse moving in all directions and draw lasso
         function onMousemove(jqEvent) {
-            var rectangle, mouseMoveCoord;
-            mouseMoveCoord = getOffsetCoord(jqEvent[MOUSE.X], jqEvent[MOUSE.Y]);
-            rectangle = Rectangle.fromCoordinates(mouseDownCoord, mouseMoveCoord);
-            drawLasso(rectangle);
+            var lassoXYMap, rectangle, mouseMoveCoord;
+            lassoXYMap = {x: 'xLasso', y: 'yLasso'};
+            // user is adding selected items to current collection
             addToSelection = jqEvent.altKey;
+            mouseMoveCoord = getMouseCoordinates(jqEvent);
+            // lasso is based on a fixed position layout
+            rectangle = Rectangle.fromCoordinates(mouseDownCoord, mouseMoveCoord, lassoXYMap);
+            drawLasso(rectangle);
+            // events are based on an absolute position layout
+            rectangle = Rectangle.fromCoordinates(mouseDownCoord, mouseMoveCoord);
             hightlighSelectedEvents(rectangle);
         }
 
@@ -199,6 +208,6 @@ function SelectEventsSelectionHandler() {
     $body.on("click.fc-select-events.fc", '.fc-event', onEventClick);
 
     // exports
-    return selectEvents;
+    return selectEventsInitiator;
 
 }

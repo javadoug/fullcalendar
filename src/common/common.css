@@ -326,7 +326,7 @@ table.fc-border-separate {
 }
 
 .fc-selection-lasso {
-	position: absolute;
+	position: fixed;
 	outline: 1px dashed silver;
 	z-index: 9999;
 }
