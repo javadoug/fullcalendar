@@ -19,6 +19,8 @@ module.exports = function(config) {
         'lib/**/*.js',
 
         /* framework files listed in dependency order */
+        'src/**/*.css',
+
         'src/defaults.js',
         'src/main.js',
         'src/Calendar.js',

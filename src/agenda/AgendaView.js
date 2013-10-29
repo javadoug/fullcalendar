@@ -463,8 +463,10 @@ function AgendaView(element, calendar, viewName) {
 			var date = colDate(col);
 			var rowMatch = this.parentNode.className.match(/fc-slot(\d+)/); // TODO: maybe use data
 			if (rowMatch) {
-				var mins = parseInt(rowMatch[1]) * opt('slotMinutes');
-				var hours = Math.floor(mins/60);
+				var top, mins, hours;
+				top = slotContent.offset().top;
+				mins = Math.floor((ev.pageY - top) / snapHeight) * snapMinutes;
+				hours = Math.floor(mins/60);
 				date.setHours(hours);
 				date.setMinutes(mins%60 + minMinute);
 				trigger('dayClick', dayBodyCells[col], date, false, ev);
