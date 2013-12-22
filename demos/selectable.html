@@ -26,8 +26,12 @@
 			},
 			selectEvents: true,
 			snapMinutes: 5,
-			selectable: true,
+			slotMinutes: 15,
+			selectable: false,
 			selectHelper: true,
+			dayClick: function () {
+				console.log('dayClick', arguments);
+			},
 			select: function(start, end, allDay) {
 				var title = prompt('Event Title:');
 				if (title) {

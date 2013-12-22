@@ -145,11 +145,15 @@ function View(element, calendar, viewName) {
 	function eventElementHandlers(event, eventElement) {
 		eventElement
 			.click(function(ev) {
-				if (!eventElement.hasClass('ui-draggable-dragging') &&
-					!eventElement.hasClass('ui-resizable-resizing') &&
-					!(opt('selectEvents') && ev.altKey)) {
+				// trigger click if not dragging, resizing or selecting
+				var draggingOrResizing, selecting;
+				draggingOrResizing = (eventElement.hasClass('ui-draggable-dragging') || eventElement.hasClass('ui-resizable-resizing'));
+				if (!draggingOrResizing) {
+					selecting = (opt('selectEvents') && ev.shiftKey);
+					if (!selecting) {
 						return trigger('eventClick', this, event, ev);
 					}
+				}
 			})
 			.hover(
 				function(ev) {

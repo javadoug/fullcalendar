@@ -26,7 +26,6 @@ describe("options::dayClick<function(date, allDay, jsEvent, view)>", function ()
 				pageX: 100,
 				pageY: 100
 			});
-			debugger
 			expect(result).toEqual(expected.toString());
 		})
 	});

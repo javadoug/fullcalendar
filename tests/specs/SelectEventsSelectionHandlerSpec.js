@@ -1,6 +1,6 @@
 describe("Select Events Selection Handler", function () {
 	describe("SelectEventsSelectionHandler", function () {
-		var lasso, element, optSpy, mouseDownMock, mouseMoveMock, selectEventsHandler, eventsSelectionHandlerMock;
+		var lasso, element, optSpy, triggerSpy, mouseDownMock, mouseMoveMock, selectEventsHandler, eventsSelectionHandlerMock;
 		beforeEach(function () {
 			// mock calendar ui
 			element = $('<div id="test-calendar"></div>').appendTo('body');
@@ -23,8 +23,10 @@ describe("Select Events Selection Handler", function () {
 			mouseMoveMock.pageY = 50;
 			optSpy = jasmine.createSpy('optSpy');
 			optSpy.andReturn(true);
+			triggerSpy = jasmine.createSpy('triggerSpy');
 			eventsSelectionHandlerMock = {
-                opt: optSpy, 
+                opt: optSpy,
+                trigger: triggerSpy,
                 isEventDraggable: jasmine.createSpy('isEventDraggableSpy')
             };
 			eventsSelectionHandlerMock.element = element;
@@ -94,7 +96,7 @@ describe("Select Events Selection Handler", function () {
 				events[1].css(css);
 				css.top = '80px';
 				css.left = '48px';
-				events[2].css(css); 
+				events[2].css(css);
 			});
 			it("selects '.fc-event' elements that intersect with the lasso", function () {
 				var position, selected;
@@ -143,29 +145,109 @@ describe("Select Events Selection Handler", function () {
 				selected = element.find(".ui-selected");
 				expect(selected.length).toEqual(2);
 			});
-			it("selects '.fc-event' elements when clicked with shift key held", function () {
-				var clickEvent = $.Event('click');
-				// setup: click on two events
-				clickEvent.shiftKey = true;
-				events[0].trigger(clickEvent);
-				clickEvent = $.Event('click');
-				clickEvent.shiftKey = true;
-				events[1].trigger(clickEvent);
-				// validate
-				selected = element.find(".ui-selected");
-				expect(selected.length).toBe(2);
+			describe("shift + click events to update selection", function () {
+				beforeEach(function () {
+					eventsSelectionHandlerMock.trigger = jasmine.createSpy('triggerSpy');
+				});
+				it("selects '.fc-event' elements when clicked with shift key held", function () {
+					var clickEvent = $.Event('click');
+					// setup: click on two events
+					clickEvent.shiftKey = true;
+					events[0].trigger(clickEvent);
+					clickEvent = $.Event('click');
+					clickEvent.shiftKey = true;
+					events[1].trigger(clickEvent);
+					// validate
+					selected = element.find(".ui-selected");
+					expect(selected.length).toBe(2);
+				});
+				it("unselects '.fc-event.ui-selected' elements when clicked with shift key held", function () {
+					var clickEvent = $.Event('click');
+					// setup: click same event twice
+					clickEvent.shiftKey = true;
+					events[0].trigger(clickEvent);
+					clickEvent = $.Event('click');
+					clickEvent.shiftKey = true;
+					events[0].trigger(clickEvent);
+					// validate
+					selected = element.find(".ui-selected");
+					expect(selected.length).toBe(0);
+				});
+				it("triggers the fc:selectEventsSelecting event when adding an element", function () {
+					var eventMock, clickEvent = $.Event('click');
+					// setup: click on one event
+					clickEvent.shiftKey = true;
+					eventMock = {className : [ '', 'ui-selected', 'ui-draggable' ]};
+					$(events[0]).data('fc:event', eventMock);
+					events[0].trigger(clickEvent);
+					// validate: the event callback was triggered
+					expect(triggerSpy).toHaveBeenCalledWith('selectEventsSelecting', eventMock, jasmine.any(Object));
+				});
+				it("triggers the fc:selectEventsUnelecting event when removing an element", function () {
+					var eventMock, clickEvent = $.Event('click');
+					eventMock = {className : [ '', 'ui-selected', 'ui-draggable' ]};
+					$(events[0]).data('fc:event', eventMock);
+					// setup: click same event twice
+					clickEvent.shiftKey = true;
+					events[0].trigger(clickEvent);
+					clickEvent = $.Event('click');
+					clickEvent.shiftKey = true;
+					events[0].trigger(clickEvent);
+					// validate: the event callback was triggered
+					expect(triggerSpy).toHaveBeenCalledWith('selectEventsUnselecting', eventMock, jasmine.any(Object));
+				});
 			});
-			it("unselects '.fc-event.ui-selected' elements when clicked with shift key held", function () {
-				var clickEvent = $.Event('click');
-				// setup: click on two events
-				clickEvent.shiftKey = true;
-				events[0].trigger(clickEvent);
-				clickEvent = $.Event('click');
-				clickEvent.shiftKey = true;
-				events[0].trigger(clickEvent);
-				// validate
-				selected = element.find(".ui-selected");
-				expect(selected.length).toBe(0);				
+			describe("deselection features", function () {
+				beforeEach(function () {
+					events[0].addClass('ui-selected');
+					events[2].addClass('ui-selected');
+				});
+				it("clicking on body deselects all selected items", function () {
+					var clickEvent = $.Event('click');
+					$('body').trigger(clickEvent);
+					// validate
+					selected = element.find(".ui-selected");
+					expect(selected.length).toBe(0);
+				});
+				it("pressing ESC key deselects all selected items", function () {
+					var keypressEvent = $.Event('keyup', {which: $.ui.keyCode.ESCAPE});
+					$('body').trigger(keypressEvent);
+					// validate
+					selected = element.find(".ui-selected");
+					expect(selected.length).toBe(0);
+				});
+				it("triggers fc:selectEventsUnselecting when events are unselected", function () {
+					var keypressEvent = $.Event('keyup', {which: $.ui.keyCode.ESCAPE});
+					$('body').trigger(keypressEvent);
+					// validate: the event callback was triggered
+					expect(triggerSpy).toHaveBeenCalledWith('selectEventsUnselecting', undefined, jasmine.any(Object));
+				});
+				it("triggers fc:selectEventsStop after events are unselected", function () {
+					var keypressEvent = $.Event('keyup', {which: $.ui.keyCode.ESCAPE});
+					$('body').trigger(keypressEvent);
+					// validate: the event callback was triggered
+					expect(triggerSpy).toHaveBeenCalledWith('selectEventsStop', jasmine.any($.Event));
+				});
+				describe("when nothing is selected", function () {
+					beforeEach(function () {
+						events[0].removeClass('ui-selected');
+						events[1].removeClass('ui-selected');
+						events[2].removeClass('ui-selected');
+					});
+					it("does not trigger fc:selectEventsUnselecting", function () {
+						var keypressEvent = $.Event('keyup', {which: $.ui.keyCode.ESCAPE});
+						$('.fc-event.ui-selected').removeClass('ui-selected');
+						$('body').trigger(keypressEvent);
+						// validate: the event callback was triggered
+						expect(triggerSpy).not.toHaveBeenCalledWith('selectEventsUnselecting', undefined, jasmine.any(Object));
+					});
+					it("does not trigger fc:selectEventsStop", function () {
+						var keypressEvent = $.Event('keyup', {which: $.ui.keyCode.ESCAPE});
+						$('body').trigger(keypressEvent);
+						// validate: the event callback was triggered
+						expect(triggerSpy).not.toHaveBeenCalledWith('selectEventsStop', jasmine.any($.Event));
+					});
+				});
 			});
 		});
 	});
@@ -181,7 +263,7 @@ describe("Select Events Selection Handler", function () {
 				expect(Rectangle.fromCoordinates(coord1, coord2)).toInclude(rectangle1)
 			});
 			it("normalizes the coordinates to top left and bottom right", function () {
-				expect(Rectangle.fromCoordinates(coord2, coord1)).toInclude(rectangle1)				
+				expect(Rectangle.fromCoordinates(coord2, coord1)).toInclude(rectangle1)
 			});
 			it("creates an object with start:{}, stop:{} and intersects()", function () {
 				var result = Rectangle.fromCoordinates(coord2, coord1);
@@ -241,5 +323,5 @@ describe("Select Events Selection Handler", function () {
 				expect(rectangle1).not.toIntersectWith(rectangle2);
 			});
 		});
-	});	
+	});
 });

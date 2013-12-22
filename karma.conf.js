@@ -44,6 +44,7 @@ module.exports = function(config) {
         'src/common/DayEventRenderer.js',
         'src/common/SelectionManager.js',
         'src/common/SelectionManagerHelper.js',
+        'src/common/SelectEventsSelectionHandler.js',
         'src/common/OverlayManager.js',
         'src/common/CoordinateGrid.js',
         'src/common/HoverListener.js',

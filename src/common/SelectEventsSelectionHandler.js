@@ -9,7 +9,6 @@
 * SUC5: selection should stick after dragging and dropping events to a new date/time
 **/
 var Rectangle = {
-
     /* given two coordinates determine upper left and bottom right coords */
     fromCoordinates: function coordinatesToRectangle(coord1, coord2, mapXY) {
         "use strict";
@@ -26,7 +25,6 @@ var Rectangle = {
             }
         };
     },
-
     /* given two rectangles determine if they intersect */
     rectanglesIntersect: function rectanglesIntersect(r1, r2) {
         "use strict";
@@ -37,26 +35,46 @@ var Rectangle = {
             (r2.start.y < r1.stop.y && r1.start.y < r2.stop.y);
         return yIntersects && xIntersects;
     }
-
 };
-
+/** Handles the selection of events inside the calendar.
+    Publishes following events;
+    selectEventsStart
+    selectEventsSelecting
+    selectEventsUnselecting
+    selectEventsStop  */
 function SelectEventsSelectionHandler() {
-
     "use strict";
-
-    var t, opt, MOUSE, $body, $doc, isEventDraggable;
-
+    var t, opt, MOUSE, $body, $doc, trigger, isEventDraggable;
     t = this;
-
     // imports
     opt = t.opt;
+    trigger = t.trigger;
     isEventDraggable = t.isEventDraggable;
-
     // locals
     $body = $("body");
     $doc = $(document);
     MOUSE = {X: "pageX", Y: "pageY", lassoX: "clientX", lassoY: "clientY"};
-
+    // add class to event object
+    // TODO: make this a general utility of FC if one does not exist
+    function updateEventClassesArray(event, addOrRemove, className) {
+        var index;
+        if (!event) {
+            return;
+        }
+        if (!$.isArray(event.className)) {
+            event.className = (event.className ? event.className : '').split(/\s+/);
+        }
+        index = event.className.indexOf(className);
+        if ('add' === addOrRemove) {
+            if (index === -1) {
+                event.className.push(className);
+            }
+        } else if ('remove' === addOrRemove) {
+            if (index > -1) {
+                event.className.splice(index, 1);
+            }
+        }
+    }
     // lasso is fixed positioned and events are relative positioned
     function getMouseCoordinates(jqEvent) {
         return {
@@ -66,12 +84,10 @@ function SelectEventsSelectionHandler() {
             yLasso: jqEvent[MOUSE.lassoY]
         };
     }
-
     // return view container based on current view
     function getViewContainer() {
         return t.element;
     }
-
     // find or create temporary ui elements
     function findOrCreateDiv(className) {
         var div = $("." + className);
@@ -80,32 +96,27 @@ function SelectEventsSelectionHandler() {
         }
         return $("<div>").addClass(className).appendTo(getViewContainer());
     }
-
-    // return fc event containers in current view
+    // return fc event dom elements in current view
     function getAllEvents() {
         return getViewContainer().find(".fc-event");
     }
-
+    // return fc event dom elements that are ui-selected
+    function getSelectedEvents() {
+        return getViewContainer().find('.fc-event.ui-selected');
+    }
     // draw lasso and highlight selected events
     function selectEventsInitiator(jqEvent) {
-
-        var mouseDownCoord, clearSelection, addToSelection;
-
+        var mouseDownCoord, clearSelection;
         // determine if the current selection should be cleared
         clearSelection = true;
-
-        // determine if the current selection should be preserved
-        addToSelection = false;
-
         // store the coordinates of the mouse on selection start
         mouseDownCoord = getMouseCoordinates(jqEvent);
-
         // prevent text selection handler
         function preventDefault(jqEvent) {
             jqEvent.preventDefault();
             return false;
         }
-
+        trigger('selectEventsStart', jqEvent);
         // given lasso rectangle select intersecting segments
         function hightlighSelectedEvents(lasso) {
             getAllEvents().each(function () {
@@ -120,23 +131,29 @@ function SelectEventsSelectionHandler() {
                         y: startCoord.y + $this.outerHeight()
                     }
                 };
+                event = $this.data('fc:event');
                 if (lasso.intersects(segment)) {
                     clearSelection = false;
-                    event = $this.data('fc:event');
                     if (isEventDraggable(event)) {
                         // TODO: make draggableDayEvent importable
                         // draggableDayEvent(event, this);
                         // eventElements only get draggable class when mouse-overed
                         $this.addClass('ui-draggable ui-selected');
+                        updateEventClassesArray(event, 'add', 'ui-selected');
+                        updateEventClassesArray(event, 'add', 'ui-draggable');
+                        trigger('selectEventsSelecting', event, $this);
                     } else {
                         $this.removeClass('ui-selected');
+                        updateEventClassesArray(event, 'remove', 'ui-selected');
+                        trigger('selectEventsUnselecting', event, $this);
                     }
-                } else if (!addToSelection) {
+                } else {
                     $this.removeClass('ui-selected');
+                    updateEventClassesArray(event, 'remove', 'ui-selected');
+                    trigger('selectEventsUnselecting', event, $this);
                 }
             });
         }
-
         // render the lasso to mouse selection range
         function drawLasso(rectangle) {
             var css, width, height;
@@ -150,13 +167,10 @@ function SelectEventsSelectionHandler() {
             };
             findOrCreateDiv("fc-selection-lasso").css(css);
         }
-
         // handle mouse moving in all directions and draw lasso
         function onMousemove(jqEvent) {
             var lassoXYMap, rectangle, mouseMoveCoord;
             lassoXYMap = {x: 'xLasso', y: 'yLasso'};
-            // user is adding selected items to current collection
-            addToSelection = jqEvent.altKey;
             mouseMoveCoord = getMouseCoordinates(jqEvent);
             // lasso is based on a fixed position layout
             rectangle = Rectangle.fromCoordinates(mouseDownCoord, mouseMoveCoord, lassoXYMap);
@@ -165,30 +179,30 @@ function SelectEventsSelectionHandler() {
             rectangle = Rectangle.fromCoordinates(mouseDownCoord, mouseMoveCoord);
             hightlighSelectedEvents(rectangle);
         }
-
         // destroy all events and clean up
-        function onMouseup() {
+        function onMouseup(jqEvent) {
             $doc.off(".fc-select-events.fc");
             $body.removeAttr("unselectable");
             $body.removeClass("fc-selecting-events");
             $(".fc-selection-lasso").remove();
             if (clearSelection) {
-                getAllEvents().removeClass('ui-selected');
+                getAllEvents().removeClass('ui-selected').each(function () {
+                    var event = $(this).data('fc:event');
+                    updateEventClassesArray(event, 'remove', 'ui-selected');
+                    trigger('selectEventsUnselecting', event, $(this));
+                });
             }
             $body.off("selectstart.fc-select-events.fc");
+            trigger('selectEventsStop', jqEvent);
         }
-
         // prevent text selection if drag mouses out of fc
         $body.addClass("fc-selecting-events");
         $body.attr("unselectable", "on");
         $body.on("selectstart.fc-select-events.fc", preventDefault);
-
         // initialize the mouse event handlers
         $doc.on("mouseup.fc-select-events.fc", onMouseup);
         $doc.on("mousemove.fc-select-events.fc", onMousemove);
-
     }
-
     // handle clicking on an event
     function onEventClick(jqEvent) {
         if (!opt('selectEvents')) {
@@ -201,32 +215,57 @@ function SelectEventsSelectionHandler() {
         var segment = $(jqEvent.currentTarget);
         if (segment.is('.ui-selected')) {
             segment.removeClass('ui-selected');
+            var event = segment.data('fc:event');
+            updateEventClassesArray(event, 'remove', 'ui-selected');
+            trigger('selectEventsUnselecting', event, segment);
         } else {
             segment.addClass('ui-selected');
+            var event = segment.data('fc:event');
+            updateEventClassesArray(event, 'add', 'ui-selected');
+            updateEventClassesArray(event, 'add', 'ui-draggable');
+            trigger('selectEventsSelecting', event, segment);
         }
+        trigger('selectEventsStop', jqEvent);
         return false;
     }
-
-    function onCalendarClick(jqEvent) {
+    function onBodyClick(jqEvent) {
+        var triggerStop = false;
          if (!opt('selectEvents')) {
             return;
         }
-        getAllEvents().removeClass('ui-selected');
-    }
-
-    function onEscapeKeyUp(jqEvent) {
-        if (jqEvent.which === $.ui.keyCode.ESCAPE) {
-            $(jqEvent.currentTarget).find('.fc-event').removeClass('ui-selected');
+        getSelectedEvents().each(function () {
+            var event = $(this).data('fc:event');
+            $(this).removeClass('ui-selected');
+            updateEventClassesArray(event, 'remove', 'ui-selected');
+            trigger('selectEventsUnselecting', event, $(this));
+            triggerStop = true;
+        });
+        if (triggerStop) {
+            // only trigger if something was unselected
+            trigger('selectEventsStop', jqEvent);
         }
     }
-
+    function onEscapeKeyUp(jqEvent) {
+        var triggerStop = false;
+        if (jqEvent.which === $.ui.keyCode.ESCAPE) {
+            getSelectedEvents().each(function () {
+                var event = $(this).data('fc:event');
+                $(this).removeClass('ui-selected');
+                updateEventClassesArray(event, 'remove', 'ui-selected');
+                trigger('selectEventsUnselecting', event, $(this));
+                triggerStop = true;
+            });
+            if (triggerStop) {
+                // only trigger if something was unselected
+                trigger('selectEventsStop', jqEvent);
+            }
+        }
+    }
     // fc-event listeners to clear or append to selection
     $body.off(".fc-select-events.fc");
     $body.on("keyup.fc-select-events.fc", onEscapeKeyUp);
-    $body.on("click.fc-select-events.fc", onCalendarClick);
+    $body.on("click.fc-select-events.fc", onBodyClick);
     $body.on("click.fc-select-events.fc", '.fc-event', onEventClick);
-
     // exports
     return selectEventsInitiator;
-
 }
